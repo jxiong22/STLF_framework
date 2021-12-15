@@ -374,8 +374,8 @@ class Dataset_ISO(Dataset):
 
 
         if self.debug:
-            border1s = [0, 50 * 24, 100*24]
-            border2s = [50 * 24, 100 * 24, 150*24]
+            border1s = [0, 30 * 24, 60*24]
+            border2s = [30 * 24, 60 * 24, 90*24]
         else:
             border1s = [0, 365*24*3+24, data_len-365*24]
             border2s = [365*24*3+192+24, 365*24*4+24, data_len]
@@ -498,8 +498,8 @@ class Dataset_Utility(Dataset):
 
 
         if self.debug:
-            border1s = [0, 10 * 24, 20*24]
-            border2s = [10 * 24, 20 * 24, 30*24]
+            border1s = [0, 10 * 24, 50*24]
+            border2s = [10 * 24, 50 * 24, 70*24]
         else:
             border1s = [0, 365*24*3+24, data_len-365*24]
             border2s = [365*24*3+192+24, 365*24*4+24, data_len]

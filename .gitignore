@@ -156,3 +156,7 @@ update_model_V3.py
 isodata.csv
 arima_test.py
 err.npy
+
+main.py
+main_test.py
+main_test_update.py
