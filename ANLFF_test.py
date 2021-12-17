@@ -42,7 +42,6 @@ def get_args():
     parser.add_argument("--save_plots", action="store_true", help="save plots when true, otherwise show")
     parser.add_argument("--logname", action="store", default='root', help="name for log")
     parser.add_argument("--test_parnn", action="store_true", help="test for parnn")
-    parser.add_argument("--dirName", action="store", type=str, default='root', help="name of the directory of the saved model")
     parser.add_argument("--subName", action="store", type=str, default='test', help="name of the directory of current run")
     parser.add_argument("--l1", type=float, default=0.01, help="L1 norm weight")
     parser.add_argument("--l2", type=float, default=0, help="variance weight")
@@ -478,6 +477,16 @@ def update_model(config, train_Dataloader, vali_Dataloader, modelDir, model_fix,
             }, path)
 
     logger.info("Training end")
+
+    checkpoint = torch.load(path, map_location='cpu')
+
+    model_update.encoder.load_state_dict(checkpoint['encoder_state_dict'])
+    model_update.decoder.load_state_dict(checkpoint['decoder_state_dict'])
+    model_update.feature.load_state_dict(checkpoint['feature_state_dict'])
+
+    model_update.encoder.eval()
+    model_update.decoder.eval()
+    model_update.feature.eval()
     return model_update
 
 
@@ -649,10 +658,6 @@ if __name__ == '__main__':
 
     model_update = update_model(config, train_Dataloader_update, vali_Dataloader_update, modelDir, model_fix,
                  train_Dataloader, args.updateCkpName, args.tryNumber)
-
-    model_update.encoder.eval()
-    model_update.decoder.eval()
-    model_update.feature.eval()
 
     new_vali_pred_updated, _, new_vali_ori_2, _ = predict_update(model_update, config, vali_Dataloader_update)
 
