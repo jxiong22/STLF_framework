@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 import numpy as np
-from custom_types import ANLF, TrainData, TrainConfig, TestData
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import Sampler
@@ -50,140 +49,6 @@ def save_or_show_plot(file_nm: str, save: bool):
         plt.savefig(os.path.join(os.path.dirname(__file__), "plots", file_nm))
     else:
         plt.show()
-
-# def preprocess_data(dat, col_names):
-#     """
-#     To scale the data and to lable them as feats and targs
-#     :param dat: data format as each row is one time step and each column is features and load
-#     :param col_names: load column
-#     :return: TrainData(feats, targs), scale
-#     """
-#     proc_dat = dat.values
-#     # proc_dat = dat
-#     numFeatures = dat.columns.get_loc("load")
-#     mask = np.ones(proc_dat.shape[1], dtype=bool) # 82 true
-#     dat_cols = list(dat.columns) # get all column name
-#     for col_name in col_names:
-#         mask[dat_cols.index(col_name)] = False
-#
-#     feats = proc_dat[:, mask]
-#     targs = proc_dat[:, ~mask]
-#
-#     # #Todo: change to automatically detect which column to scale
-#     scaleX = StandardScaler().fit(feats[:,:numFeatures])
-#     scaleY = StandardScaler().fit(targs)
-#     feats_scaled = scaleX.transform(feats[:,:numFeatures])
-#     targs_scaled = scaleY.transform(targs)
-#     feats_scaled_combine = np.concatenate([feats_scaled, feats[:,numFeatures:]], axis=1)
-#     train_data_scaled = TrainData(feats_scaled_combine, targs_scaled)
-#
-#     #Todo: change to automatically detect which column to scale
-#     # scaleX = StandardScaler().fit(feats)
-#     # scaleY = StandardScaler().fit(targs)
-#     # feats_scaled = scaleX.transform(feats)
-#     # targs_scaled = scaleY.transform(targs)
-#     # train_data_scaled = TrainData(feats_scaled, targs_scaled)
-#
-#
-#     train_data = TrainData(feats, targs)
-#
-#     # #################
-#     #
-#     # # Define which columns should be encoded vs scaled
-#     # columns_to_encode = ['rank']
-#     # columns_to_scale = ['gre', 'gpa']
-#     #
-#     # # Instantiate encoder/scaler
-#     # scaler = StandardScaler()
-#     # # ohe = OneHotEncoder(sparse=False)
-#     #
-#     # # Scale and Encode Separate Columns
-#     # # scaled_columns = scaler.fit_transform(dataset[columns_to_scale])
-#     # # encoded_columns = ohe.fit_transform(dataset[columns_to_encode])
-#     #
-#     # # Concatenate (Column-Bind) Processed Columns Back Together
-#     # # processed_data = np.concatenate([scaled_columns, encoded_columns], axis=1)
-#
-#
-#
-#     # x_sd, y_sd = SD_test(train_data, SD)
-#     # x_sd = x_sd.reshape(x_sd.shape[0],-1,x_sd.shape[-1]) # (batch_Size, n_day*24, m_features)
-#     # y_sd = y_sd.reshape(y_sd.shape[0],-1) # (batch_Size, n_day*24)
-#     # x_sd = X_SD1
-#     # y_sd = Y_SD1
-#     return train_data_scaled, scaleX, scaleY, train_data
-#
-# def preprocess_test(dat, col_names, scaleX, scaleY):
-#     """
-#     To scale the data and to lable them as feats and targs
-#     :param dat: data format as each row is one time step and each column is features and load
-#     :param col_names: load column
-#     :return: TrainData(feats, targs), scale
-#     """
-#     proc_dat = dat.values
-#     numFeatures = dat.columns.get_loc("load")
-#
-#     mask = np.ones(proc_dat.shape[1], dtype=bool) # 82 true
-#     dat_cols = list(dat.columns) # get all column name
-#     for col_name in col_names:
-#         mask[dat_cols.index(col_name)] = False
-#
-#     feats = proc_dat[:, mask]
-#     targs = proc_dat[:, ~mask]
-#
-#     feats_scaled = scaleX.transform(feats[:,:numFeatures])
-#     targs_scaled = scaleY.transform(targs)
-#
-#     feats_scaled_combine = np.concatenate([feats_scaled, feats[:, numFeatures:]], axis=1)
-#
-#     test_data_scaled = TestData(feats_scaled_combine, targs_scaled)
-#
-#     # feats_scaled = scaleX.transform(feats)
-#     # targs_scaled = scaleY.transform(targs)
-#     # test_data_scaled = TestData(feats_scaled, targs_scaled)
-#
-#
-#     test_data = TestData(feats, targs)
-#
-#
-#
-#     return test_data_scaled, test_data
-#
-#
-# def data_loader(logger, debug, runiso):
-#     if runiso:
-#         raw_data_ori = pd.read_csv(os.path.join("data", "ISONE.csv"), nrows=2400*10 if debug else None)
-#         date_rng = pd.date_range(start='1/1/2015 00:00:00', end='12/31/2019 23:00:00', freq='H')
-#         # raw_data = raw_data_ori.iloc[-365 * 24 * 5:, -raw_data_ori.shape[1]+1:].set_index(date_rng).reset_index()
-#         raw_data = raw_data_ori.iloc[-365 * 24 * 5-25:-1, -raw_data_ori.shape[1]+3:].set_index(date_rng)
-#
-#         raw_data = create_datetype_column(raw_data)
-#         logger.info(f"features: {raw_data.columns.values}.")
-#
-#     else:
-#         raw_data_ori = pd.read_csv(os.path.join("data", "GEFCom2014-E.csv"), nrows=2400 if debug else None)
-#         raw_data_dropna = raw_data_ori.dropna().reset_index()
-#         # raw_data = raw_data_dropna.iloc[-365 * 24 * 5-25:, 3:5]
-#
-#         date_rng = pd.date_range(start='1/1/2010 00:00:00', end='12/31/2014 23:00:00', freq='H')
-#         raw_data = raw_data_dropna.iloc[-365 * 24 * 5-25:-1, 3:5].set_index(date_rng)
-#
-#         raw_data = create_datetype_column(raw_data)
-#
-#     # split data
-#     train_raw, test_raw = split_data(raw_data)
-#     # train_raw_save = train_raw.iloc[0,:]
-#     # train_raw_save.to_csv('train_raw_save.csv')
-#
-#     logger.info(f"Shape of train data: {train_raw.shape}. Shape of test data: {test_raw.shape}.")
-#     targ_cols = ("load",)
-#
-#     # Normalize data and feats is feature and targs is y
-#     train_data, scalerX, scalerY, train_data_ori = preprocess_data(train_raw, targ_cols)
-#     test_data, test_data_ori = preprocess_test(test_raw, targ_cols, scalerX, scalerY)
-#     out_feats = len(targ_cols)
-#
-#     return train_data, scalerY, train_data_ori, out_feats, test_data, test_data_ori
 
 
 def split_data(x):
@@ -237,7 +102,6 @@ def create_datetype_column(data_set):
     local = pd.get_dummies(local)
     local = pd.get_dummies(local, columns=['hour_of_day'])
 
-    # indices = [[0,0,0],[]]
 
     return local
 
@@ -263,10 +127,6 @@ def mkdirectory(config, subName, saveModel):
         model_name = "/model_iso_" + "D_" + str(int(config.past_T / 24)) + "_batch_" + str(
             config.batch_size) + "_ed_" + str(config.hidden_size) + "_epochs_" + str(
             config.epochs) + log_name
-        # else:
-        #     model_name = "/model_" + "D_" + str(int(config.past_T / 24)) + "_batch_" + str(
-        #         config.batch_size) + "_ed_" + str(config.encoder_hidden_size) + "_epochs_" + str(
-        #         config.epochs) + log_name
 
         dirName_model = "history_model/" + subName + model_name
         mkdir(dirName_model)
@@ -366,7 +226,6 @@ class Dataset_ISO(Dataset):
             df_raw = df_raw.iloc[-365 * 24 * 5 - 25:-1, -df_raw.shape[1] + 3:].set_index(date_rng)
             df_raw = create_datetype_column(df_raw)
             self.logger.info(f"features: {df_raw.columns.values}.")
-            data_dict[self.data_path] = df_raw
             # df_raw.to_csv('isodata.csv',index=False)
         else:
             df_raw = data_dict[self.data_path]
@@ -374,8 +233,8 @@ class Dataset_ISO(Dataset):
 
 
         if self.debug:
-            border1s = [0, 30 * 24, 60*24]
-            border2s = [30 * 24, 60 * 24, 90*24]
+            border1s = [0, 10 * 24, 20*24]
+            border2s = [10 * 24, 20 * 24, 30*24]
         else:
             border1s = [0, 365*24*3+24, data_len-365*24]
             border2s = [365*24*3+192+24, 365*24*4+24, data_len]
@@ -393,8 +252,10 @@ class Dataset_ISO(Dataset):
             targs = proc_dat[:, ~mask]
 
         self.numFeatures = df_raw.columns.get_loc("load")
-        self.scalerX.fit(feats[:, :self.numFeatures])
-        self.scalerY.fit(targs)
+        if self.data_path not in data_dict:
+            self.scalerX.fit(feats[:, :self.numFeatures])
+            self.scalerY.fit(targs)
+            data_dict[self.data_path] = df_raw
         feats_scaled = self.scalerX.transform(feats[:, :self.numFeatures])
         targs_scaled = self.scalerY.transform(targs)
         feats_scaled_combine = np.concatenate([feats_scaled, feats[:, self.numFeatures:]], axis=1)
@@ -420,26 +281,6 @@ class Dataset_ISO(Dataset):
 
     def __len__(self):
         return len(self.feats) - self.past_T - self.future_T + 1
-
-    # @property
-    # def scalerX(self):
-    #     return self.scalerX
-    #
-    # @property
-    # def scalerY(self):
-    #     return self.scalerY
-    #
-    # @property
-    # def featureSize(self):
-    #     return self.featureSize
-    #
-    # @property
-    # def targsScaled(self):
-    #     return self.targs[self.past_T:]
-    #
-    # @property
-    # def targsOri(self):
-    #     return self.targs_ori[self.past_T:]
 
     def inverse_transform(self, data):
         return self.scalerY.inverse_transform(data)
@@ -491,15 +332,14 @@ class Dataset_Utility(Dataset):
 
             df_raw = create_datetype_column(df_raw)
             self.logger.info(f"features: {df_raw.columns.values}.")
-            data_dict[self.data_path] = df_raw
         else:
             df_raw = data_dict[self.data_path]
         data_len = df_raw.shape[0]
 
 
         if self.debug:
-            border1s = [0, 10 * 24, 50*24]
-            border2s = [10 * 24, 50 * 24, 70*24]
+            border1s = [0, 10 * 24, 20*24]
+            border2s = [10 * 24, 20 * 24, 30*24]
         else:
             border1s = [0, 365*24*3+24, data_len-365*24]
             border2s = [365*24*3+192+24, 365*24*4+24, data_len]
@@ -517,8 +357,10 @@ class Dataset_Utility(Dataset):
             targs = proc_dat[:, ~mask]
 
         self.numFeatures = df_raw.columns.get_loc("load")
-        self.scalerX.fit(feats[:, :self.numFeatures])
-        self.scalerY.fit(targs)
+        if self.data_path not in data_dict:
+            self.scalerX.fit(feats[:, :self.numFeatures])
+            self.scalerY.fit(targs)
+            data_dict[self.data_path] = df_raw
         feats_scaled = self.scalerX.transform(feats[:, :self.numFeatures])
         targs_scaled = self.scalerY.transform(targs)
         feats_scaled_combine = np.concatenate([feats_scaled, feats[:, self.numFeatures:]], axis=1)
@@ -544,37 +386,12 @@ class Dataset_Utility(Dataset):
     def __len__(self):
         return len(self.feats) - self.past_T - self.future_T + 1
 
-    # @property
-    # def scalerX(self):
-    #     return self.scalerX
-    #
-    # @property
-    # def scalerY(self):
-    #     return self.scalerY
-    #
-    # @property
-    # def featureSize(self):
-    #     return self.featureSize
-    #
-    # @property
-    # def targsScaled(self):
-    #     return self.targs[self.past_T:]
-    #
-    # @property
-    # def targsOri(self):
-    #     return self.targs_ori[self.past_T:]
-
     def inverse_transform(self, data):
         return self.scalerY.inverse_transform(data)
 
 
 
 class testSampler(Sampler):
-    r"""Samples elements sequentially, always in the same order.
-
-    Args:
-        data_source (Dataset): dataset to sample from
-    """
 
     def __init__(self, length):
         self.length = length
@@ -594,8 +411,6 @@ class Dataset_Update(Dataset):
         self.targs_pred = targs_pred
         self.targs_ori = targs_ori
         self.err = self.targs - self.targs_pred
-        # scaler = StandardScaler()
-        # self.err = scaler.fit_transform(err)
         self.past_T = past_T
         self.future_T = future_T
 
