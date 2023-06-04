@@ -70,18 +70,12 @@ def pa_rnn(config):
                   "out_feats": config.out_feats}
 
     decoder = Decoder(**dec_kwargs).to(device)
-    feature = FeatureLayer(config.feature_size, config.numFeature+1).to(device)
+    feature = FeatureLayer(config.feature_size).to(device)
 
-    encoder_optimizer = optim.Adam(
-        params=[p for p in encoder.parameters() if p.requires_grad],
+    optimizer = optim.Adam(
+        params=[p for p in encoder.parameters() if p.requires_grad] + [p for p in decoder.parameters() if p.requires_grad] + [p for p in feature.parameters() if p.requires_grad],
         lr=config.lr)
-    decoder_optimizer = optim.Adam(
-        params=[p for p in decoder.parameters() if p.requires_grad],
-        lr=config.lr)
-    feature_optimizer = optim.Adam(
-        params=[p for p in feature.parameters() if p.requires_grad],
-        lr=config.lr)
-    pa_rnn_net = ANLF(encoder, decoder, feature, encoder_optimizer, decoder_optimizer, feature_optimizer)
+    pa_rnn_net = ANLF(encoder, decoder, feature, optimizer)
 
     return pa_rnn_net
 
@@ -96,14 +90,11 @@ def train(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, modelDir):
 
     y_vali = vali_Dataloader.dataset.targs[t_cfg.past_T:]
     y_vali = torch.from_numpy(y_vali).type(torch.FloatTensor)
-
-    scheduler_enc = StepLR(net.enc_opt, step_size=30, gamma=0.1)
-    scheduler_dec = StepLR(net.dec_opt, step_size=30, gamma=0.1)
-    scheduler_fea = StepLR(net.fea_opt, step_size=30, gamma=0.1)
+    scheduler = StepLR(net.opt, step_size=30, gamma=0.1)
 
     checkpointBest = "checkpoint_best.ckpt"
     path = os.path.join(modelDir, checkpointBest)
-    n_iter = 0 # counting iteration number
+    n_iter = 0
     for e_i in range(t_cfg.epochs):
 
         logger.info(f"# of epoches: {e_i}")
@@ -131,9 +122,7 @@ def train(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, modelDir):
                 'encoder_state_dict': net.encoder.state_dict(),
                 'decoder_state_dict': net.decoder.state_dict(),
                 'feature_state_dict': net.feature.state_dict(),
-                'encoder_optimizer_state_dict': net.enc_opt.state_dict(),
-                'decoder_optimizer_state_dict': net.dec_opt.state_dict(),
-                'feature_optimizer_state_dict': net.fea_opt.state_dict(),
+                'optimizer_state_dict': net.opt.state_dict(),
             }, os.path.join(modelDir, checkpointName))
 
 
@@ -142,17 +131,13 @@ def train(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, modelDir):
             print("Early stopping")
             break
 
-        scheduler_enc.step()
-        scheduler_dec.step()
-        scheduler_fea.step()
+        scheduler.step()
 
     checkpoint = torch.load(os.path.join(modelDir, checkpointBest), map_location=device)
     net.encoder.load_state_dict(checkpoint['encoder_state_dict'])
     net.decoder.load_state_dict(checkpoint['decoder_state_dict'])
     net.feature.load_state_dict(checkpoint['feature_state_dict'])
-    net.enc_opt.load_state_dict(checkpoint['encoder_optimizer_state_dict'])
-    net.dec_opt.load_state_dict(checkpoint['decoder_optimizer_state_dict'])
-    net.fea_opt.load_state_dict(checkpoint['feature_optimizer_state_dict'])
+    net.opt.load_state_dict(checkpoint['optimizer_state_dict'])
     net.encoder.eval()
     net.decoder.eval()
     net.feature.eval()
@@ -168,9 +153,7 @@ def train(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, modelDir):
 
 def train_iteration(t_net, loss_func, X, y_history, y_target, target_feats, l1, l2):
 
-    t_net.enc_opt.zero_grad()
-    t_net.dec_opt.zero_grad()
-    t_net.fea_opt.zero_grad()
+    t_net.opt.zero_grad()
 
     X = X.type(torch.FloatTensor).to(device)
     y_history = y_history.type(torch.FloatTensor).to(device)
@@ -185,10 +168,7 @@ def train_iteration(t_net, loss_func, X, y_history, y_target, target_feats, l1, 
     var = torch.var(attn_weights) # optional
     loss = loss_func(y_pred, y_target) + l1 * l1_norm - l2 * var
     loss.backward()
-
-    t_net.fea_opt.step()
-    t_net.enc_opt.step()
-    t_net.dec_opt.step()
+    t_net.opt.step()
 
     return loss.item()
 
@@ -198,25 +178,21 @@ def train_update(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, model
     iter_loss_all = []
     epoch_loss = []
     vali_loss = []
-    early_stopping = EarlyStopping(logger, patience=t_cfg.patience, verbose=True)
+    early_stopping = EarlyStopping(logger, patience=10, verbose=True)
 
     checkpointBest = ckpName + '.ckpt'
     path = os.path.join(modelDir, checkpointBest)
-    n_iter = 0  # counting iteration number
-    # for e_i in range(1):
-    for e_i in range(t_cfg.epochs):
+    n_iter = 0
+    for e_i in range(20):
 
         logger.info(f"# of epoches: {e_i}")
-        # for t_i in range(0, end_point, t_cfg.batch_size):
         for t_i, (feats, err, y_target, target_feats, err_target, targs_pred, y_target_ori, y_history) in enumerate(
                 train_Dataloader):
             loss = train_iteration_update(net, criterion, feats, err, y_target, target_feats, t_cfg.l1, t_cfg.l2,
                                           targs_pred, err_target)
-            # iter_losses[e_i * iter_per_epoch + t_i // t_cfg.batch_size] = loss
             iter_loss.append(loss)
             n_iter += 1
 
-        # epoch_losses[e_i] = np.mean(iter_losses[range(e_i * iter_per_epoch, (e_i + 1) * iter_per_epoch)])
         epoch_losses = np.average(iter_loss)
         iter_loss = np.array(iter_loss).reshape(-1)
         iter_loss_all.append(iter_loss)
@@ -240,9 +216,6 @@ def train_update(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, model
     net.encoder.load_state_dict(checkpoint['encoder_state_dict'])
     net.decoder.load_state_dict(checkpoint['decoder_state_dict'])
     net.feature.load_state_dict(checkpoint['feature_state_dict'])
-    # net.enc_opt.load_state_dict(checkpoint['encoder_optimizer_state_dict'])
-    # net.dec_opt.load_state_dict(checkpoint['decoder_optimizer_state_dict'])
-    # net.fea_opt.load_state_dict(checkpoint['feature_optimizer_state_dict'])
     net.encoder.eval()
     net.decoder.eval()
     net.feature.eval()
@@ -256,25 +229,13 @@ def train_update(net, train_Dataloader, vali_Dataloader, t_cfg, criterion, model
 
 
 def train_iteration_update(t_net, loss_func, X, err, y_target, target_feats, l1, l2, targs_pred, err_target):
-    '''
-    training process (forward and backwark) for each iteration
-    :param t_net: pa_rnn_net(encoder, decoder, encoder_optimizer, decoder_optimizer)
-    :param loss_func: nn.MSELoss() defined in config
-    :param X: input feature
-    :param y_history: y_history
-    :param y_target: true forecast value
-    :return: loss value
-    '''
-    t_net.enc_opt.zero_grad()
-    t_net.dec_opt.zero_grad()
-    # t_net.fea_opt.zero_grad()
+
+    t_net.opt.zero_grad()
 
     X = X.type(torch.FloatTensor).to(device)
     err = err.type(torch.FloatTensor).to(device)
-    y_target = y_target.type(torch.FloatTensor).to(device)
     target_feats = target_feats.type(torch.FloatTensor).to(device)
     err_target = err_target.type(torch.FloatTensor).to(device)
-    targs_pred = targs_pred.type(torch.FloatTensor).to(device)
     attn_weights, weighted_history_input, weighted_future_input = t_net.feature(X, target_feats)
     input_encoded, hidden, cell = t_net.encoder(weighted_history_input, err)
     out = t_net.decoder(input_encoded, weighted_history_input, err, weighted_future_input, hidden, cell)
@@ -282,8 +243,7 @@ def train_iteration_update(t_net, loss_func, X, err, y_target, target_feats, l1,
     loss = loss_func(out, err_target)
     loss.backward()
 
-    t_net.enc_opt.step()
-    t_net.dec_opt.step()
+    t_net.opt.step()
 
     return loss.item()
 
@@ -305,15 +265,8 @@ def predict(t_net: ANLF, t_cfg: TrainConfig, vali_Dataloader):
 
 
 def predict_check(t_net: ANLF, t_cfg: TrainConfig, vali_Dataloader):
-    '''
 
-    :param t_net: pa_rnn_net(encoder, decoder, encoder_optimizer, decoder_optimizer)
-    :param t_dat: data include train and evaluation and test.
-    :param t_cfg: config file for train
-    :param on_train: when on_train, predict will evaluate the result using train sample, otherwise, use test sample
-    :return: y_pred:
-    '''
-    y_pred = []  # (test_size)
+    y_pred = []
     y_true_ori = []
 
     with torch.no_grad():
@@ -337,15 +290,8 @@ def predict_check(t_net: ANLF, t_cfg: TrainConfig, vali_Dataloader):
 
 
 def predict_update(t_net: ANLF, t_cfg: TrainConfig, vali_Dataloader):
-    '''
 
-    :param t_net: pa_rnn_net(encoder, decoder, encoder_optimizer, decoder_optimizer)
-    :param t_dat: data include train and evaluation and test.
-    :param t_cfg: config file for train
-    :param on_train: when on_train, predict will evaluate the result using train sample, otherwise, use test sample
-    :return: y_pred:
-    '''
-    y_pred = []  # (test_size)
+    y_pred = []
     y_true = []
     y_true_ori = []
     y_pred_old = []
@@ -449,6 +395,8 @@ def update_model(config, train_Dataloader, vali_Dataloader, modelDir, model_fix,
         model_update = copy.deepcopy(model_fix)
         model_update.encoder.train()
         model_update.decoder.train()
+        for param in model_update.feature.parameters():
+            param.requires_grad = False
         logger.info(f"Try {i}")
         uCkpName = updateCkpName + str(i)
         net, score = train_update(model_update, train_Dataloader, vali_Dataloader, config, criterion, modelDir,
@@ -460,20 +408,16 @@ def update_model(config, train_Dataloader, vali_Dataloader, modelDir, model_fix,
                 'encoder_state_dict': net.encoder.state_dict(),
                 'decoder_state_dict': net.decoder.state_dict(),
                 'feature_state_dict': net.feature.state_dict(),
-                'encoder_optimizer_state_dict': net.enc_opt.state_dict(),
-                'decoder_optimizer_state_dict': net.dec_opt.state_dict(),
-                'feature_optimizer_state_dict': net.fea_opt.state_dict(),
+                'optimizer_state_dict': net.opt.state_dict(),
             }, path)
         elif score < best_score:
-            best_score = score
             logger.info(f'----------MAPE decreased ({best_score:.6f} --> {score:.6f}).  Saving model ...')
+            best_score = score
             torch.save({
                 'encoder_state_dict': net.encoder.state_dict(),
                 'decoder_state_dict': net.decoder.state_dict(),
                 'feature_state_dict': net.feature.state_dict(),
-                'encoder_optimizer_state_dict': net.enc_opt.state_dict(),
-                'decoder_optimizer_state_dict': net.dec_opt.state_dict(),
-                'feature_optimizer_state_dict': net.fea_opt.state_dict(),
+                'optimizer_state_dict': net.opt.state_dict(),
             }, path)
 
     logger.info("Training end")
@@ -591,7 +535,7 @@ if __name__ == '__main__':
     model_fix = run_parnn(config, train_Dataloader, vali_Dataloader, modelDir)
 
     ## test without error correction
-    logger.info("test start")
+    logger.info("test without error correction")
     test_pred_old = predict(model_fix, config, test_Dataloader)
 
     test_pred_old_ori = train_Dataloader.dataset.inverse_transform(test_pred_old)
@@ -629,6 +573,7 @@ if __name__ == '__main__':
     trainIndex, valiIndex = train_test_split(index, test_size=args.test_size, shuffle=False)
     valiIndex = valiIndex[valiIndex % 24 == 0]
     train_subsampler = torch.utils.data.SubsetRandomSampler(trainIndex)
+    vali_subsampler = torch.utils.data.SubsetRandomSampler(valiIndex)
 
     train_Dataloader_update = DataLoader(
         trainData_update,
@@ -638,7 +583,7 @@ if __name__ == '__main__':
     vali_Dataloader_update = DataLoader(
         trainData_update,
         batch_size=1,
-        sampler=valiIndex)
+        sampler=vali_subsampler)
 
     sampler = testSampler(testData.__len__() - config.past_T)
     sampler_vali = testSampler(trainData_update.__len__())
@@ -663,7 +608,7 @@ if __name__ == '__main__':
 
     new_vali_pred_updated_ori = trainData.inverse_transform(new_vali_pred_updated)
     logger.info(f"Old score vali: ")
-    evaluate_score(new_vali_ori_2.numpy(), new_vali_pred_old_ori)
+    evaluate_score(new_vali_ori.numpy(), new_vali_pred_old_ori)
 
     logger.info(f"New score vali: ")
     evaluate_score(new_vali_ori_2.numpy(), new_vali_pred_updated_ori)
@@ -674,6 +619,7 @@ if __name__ == '__main__':
         logger.info(f"parnn_original: ")
 
         evaluate_score(test_real_ori[config.past_T:], test_pred_old_ori[config.past_T:])
+        # evaluate_score(test_real_ori, test_pred_old_ori)
 
         ############# adjust
 
