@@ -123,7 +123,6 @@ def mkdirectory(config, subName, saveModel):
     mkdir(dirName_log)
 
     if saveModel is True:
-        # if config.runiso:
         model_name = "/model_iso_" + "D_" + str(int(config.past_T / 24)) + "_batch_" + str(
             config.batch_size) + "_ed_" + str(config.hidden_size) + "_epochs_" + str(
             config.epochs) + log_name
@@ -131,7 +130,6 @@ def mkdirectory(config, subName, saveModel):
         dirName_model = "history_model/" + subName + model_name
         mkdir(dirName_model)
         return dirName_model
-    # else:
 
 
 class EarlyStopping:
@@ -168,9 +166,7 @@ class EarlyStopping:
             'encoder_state_dict': net.encoder.state_dict(),
             'decoder_state_dict': net.decoder.state_dict(),
             'feature_state_dict': net.feature.state_dict(),
-            'encoder_optimizer_state_dict': net.enc_opt.state_dict(),
-            'decoder_optimizer_state_dict': net.dec_opt.state_dict(),
-            'feature_optimizer_state_dict': net.fea_opt.state_dict(),
+            'optimizer_state_dict': net.opt.state_dict(),
         }, path)
 
         self.val_loss_min = val_loss
@@ -178,7 +174,6 @@ class EarlyStopping:
 
 
 def fillZero(df, type=0):
-    # type 0 is filled by average of prev and next hour; type 1 is filled by average of prev and next day.
     zeroIdx = df[df.isin([0]).any(axis=1)].index
     if type is 0:
         nextIdx = zeroIdx + pd.offsets.Hour(1)
@@ -191,7 +186,7 @@ def fillZero(df, type=0):
     return df
 
 
-data_dict = dict() # string: object
+data_dict = dict()
 
 class Dataset_ISO(Dataset):
     def __init__(self, logger, flag='train', past_T=24*7, future_T=24,
@@ -242,7 +237,6 @@ class Dataset_ISO(Dataset):
         border2 = border2s[self.set_type]
 
         proc_dat = df_raw[border1:border2].values
-        # proc_dat = dat
 
         mask = np.ones(proc_dat.shape[1], dtype=bool)  # 82 true
         dat_cols = list(df_raw.columns)  # get all column name
@@ -322,10 +316,7 @@ class Dataset_Utility(Dataset):
             df_temp = df_temp.loc['1987-1-1':'1991-12-31'].values.reshape(-1)
             df_load = df_load.loc['1987-1-1':'1991-12-31'].values.reshape(-1)
 
-
-            # df_raw = pd.read_csv(os.path.join("data", self.data_path+".csv"))
             date_rng = pd.date_range(start='1/1/1987 00:00:00', end='12/31/1991 23:00:00', freq='H')
-            # df_raw = df_raw.iloc[-365 * 24 * 5 - 25:-1, -df_raw.shape[1] + 3:].set_index(date_rng)
 
             df_raw = pd.DataFrame({'T':df_temp,'load':df_load}, index=date_rng)
             df_raw = fillZero(df_raw)

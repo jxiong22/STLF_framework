@@ -1,30 +1,19 @@
 
-import os
-import typing
 import utils
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
 import joblib
 import copy
 
 from numpy import save
-from datetime import  datetime
-
-import torch
-from torch import nn
 from torch import optim
 from torch.optim.lr_scheduler import StepLR
-
-from custom_types import ANLF, TrainConfig
-
-from modules import Encoder, Decoder, FeatureLayer
 from sklearn import metrics
-from utils import EarlyStopping
-
 from torch.utils.data import DataLoader
-from utils import Dataset_ISO, testSampler, Dataset_Utility, Dataset_Update
 from sklearn.model_selection import train_test_split
+from custom_types import *
+from modules import *
+from utils import *
+
 
 
 def get_args():
@@ -32,26 +21,24 @@ def get_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--debug", action="store_true", help="debug mode")
-    parser.add_argument("--batch", type=int, default=64, help="Batch size")
+    parser.add_argument("--batch", type=int, default=128, help="Batch size")
     parser.add_argument("--D", type=int, default=7, help="Past day step")
     parser.add_argument("--f_T", type=int, default=24, help="forecast time step")
     parser.add_argument("--HpD", type=int, default=24, help="Hour per Day")
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate")
     parser.add_argument("--hidden", type=int, default=128, help="hidden size")
-    parser.add_argument("--epochs", type=int, default=60, help="training epochs")
-    parser.add_argument("--save_plots", action="store_true", help="save plots when true, otherwise show")
+    parser.add_argument("--epochs", type=int, default=100, help="training epochs")
     parser.add_argument("--logname", action="store", default='root', help="name for log")
-    parser.add_argument("--test_parnn", action="store_true", help="test for parnn")
-    parser.add_argument("--subName", action="store", type=str, default='test', help="name of the directory of current run")
+    parser.add_argument("--subName", action="store", type=str, default='test', help="name of the directory for current run")
     parser.add_argument("--l1", type=float, default=0.01, help="L1 norm weight")
     parser.add_argument("--l2", type=float, default=0, help="variance weight")
-    parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
-    parser.add_argument('--data', action="store",  type=str, default='ISONE', help='data')
-    parser.add_argument("--final_run", action="store_true", help="test for parnn")
-    parser.add_argument("--test_size", type=float, default=0.5, help="test size")
+    parser.add_argument('--patience', type=int, default=30, help='early stopping patience')
+    parser.add_argument('--data', action="store",  type=str, default='ISONE', help='ISONE: ISO-NE dataset; Utility: NAU dataset')
+    parser.add_argument("--final_run", action="store_true", help="including test result")
+    parser.add_argument("--test_size", type=float, default=0.2, help="validation proportion for error correction")
     parser.add_argument("--updateCkpName", action="store", type=str, default='checkpoint_update1',
-                        help="name of checkpoint update name")
-    parser.add_argument('--tryNumber', type=int, default=5, help='try n times')
+                        help="name of error correction model checkpoint name")
+    parser.add_argument('--tryNumber', type=int, default=2, help='# of trail for training error correction module')
 
     return parser.parse_args()
 
@@ -320,17 +307,9 @@ def predict_update(t_net: ANLF, t_cfg: TrainConfig, vali_Dataloader):
 
     return out.cpu(), y_true, y_true_ori, y_pred_old
 
-def mean_absolute_percentage_error(y_true, y_pred):
-    y_true, y_pred = np.array(y_true), np.array(y_pred)
-    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
-
 def mape(y_true, y_pred):
 
     return np.mean(np.abs((y_pred - y_true) / y_true)) * 100
-
-
-def smape(y_true, y_pred):
-    return 2.0 * np.mean(np.abs(y_pred - y_true) / (np.abs(y_pred) + np.abs(y_true))) * 100
 
 def evaluate_score(y_real, y_predict):
     # MAE
@@ -442,7 +421,6 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using computation device: {device}")
     logger.info(args)
-    save_plots = args.save_plots
 
     data_dict = {
         'ISONE': Dataset_ISO,
@@ -620,8 +598,6 @@ if __name__ == '__main__':
 
         evaluate_score(test_real_ori[config.past_T:], test_pred_old_ori[config.past_T:])
         # evaluate_score(test_real_ori, test_pred_old_ori)
-
-        ############# adjust
 
         logger.info("update start")
         test_pred_updated, _, _, _ = predict_update(model_update, config, test_Dataloader_update)

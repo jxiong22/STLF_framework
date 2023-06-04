@@ -55,4 +55,5 @@ class TestData(typing.NamedTuple):
     targs: np.ndarray
 
 
-ANLF = collections.namedtuple("ANLF", ["encoder", "decoder", "feature", "enc_opt", "dec_opt", "fea_opt"])
+# ANLF = collections.namedtuple("ANLF", ["encoder", "decoder", "feature", "enc_opt", "dec_opt", "fea_opt"])
+ANLF = collections.namedtuple("ANLF", ["encoder", "decoder", "feature", "opt"])
